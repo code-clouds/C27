@@ -2,79 +2,135 @@ const Engine = Matter.Engine;
 const World = Matter.World;
 const Bodies = Matter.Bodies;
 const Constraint = Matter.Constraint;
+var engine, world, backgroundImg;
+var canvas, angle, tower, ground, cannon, boat;
+var balls = [];
+var boats = [];
+var boatAnimation = [];
+var boatSpriteData, boatSpriteSheet;
+var brokenBoatAnimation = [];
+var brokenBoatSpritedata, brokenBoatSpriteSheet;
 
-var engine, world;
-var canvas;
-var palyer, playerBase;
-var computer, computerBase;
-
-var arrow;
 
 
-function setup() {
-  canvas = createCanvas(windowWidth, windowHeight);
-
-  engine = Engine.create();
-  world = engine.world;
-
-  playerBase = new PlayerBase(300, random(450, height - 300), 180, 150);
-  player = new Player(285, playerBase.body.position.y - 153, 50, 180);
-  playerArcher = new PlayerArcher(
-    340,
-    playerBase.body.position.y - 180,
-    120,
-    120
-  );
-
-  computerBase = new ComputerBase(
-    width - 300,
-    random(450, height - 300),
-    180,
-    150
-  );
-  computer = new Computer(
-    width - 280,
-    computerBase.body.position.y - 153,
-    50,
-    180
-  );
-  computerArcher = new ComputerArcher(
-    width - 340,
-    computerBase.body.position.y - 180,
-    120,
-    120
-  );
-  
-  arrow = new PlayerArrow(playerArcher.body.position.x, playerArcher.body.position.y, 100, 10);
-  
+function preload() {
+  backgroundImg = loadImage("./assets/background.gif");
+  towerImage = loadImage("./assets/tower.png");
+  boatSpriteData = loadJSON("assets/boat/boat.json");
+  boatSpriteSheet = loadImage("assets/boat/boat.png");
+  brockenBoatSpritedata = loadJSON("assets/boat/brocken_boat.png");
+  brokenBoatSpriteSheet = loadImage("assets/boat/broken_boat.png");
 }
 
-function draw() {
-  background(180);
+function setup() {
+  canvas = createCanvas(windowWidth - 200, windowHeight - 150);
+  engine = Engine.create();
+  world = engine.world;
+  angle = -PI / 4;
+  ground = new Ground(0, height - 1, width * 2, 1);
+  tower = new Tower(width / 2 - 650, height - 290, 250, 580);
+  cannon = new Cannon(width / 2 - 600, height / 2 - 220, 120, 40, angle);
 
-  Engine.update(engine);
-
-  // Title
-  fill("white");
-  textAlign("center");
-  textSize(40);
-  text("EPIC ARCHERY", width / 2, 100);
-
- 
-  playerBase.display();
-  player.display();
-  
-
-  computerBase.display();
-  computer.display();
-  
-  playerArcher.display();
-  computerArcher.display()
-  arrow.display()
-  if(keyCode === 32){
-   arrow.shoot(playerArcher.body.angle);
+  boat = new Boat(width, height - 100, 200, 200, -100);
+  var boatFrames = boatSpriteData.frames;
+  for (var i = 0; i < boatFrames.length; i++) {
+    var pos = boatFrames[i].position;
+    var img = boatSpriteSheet.get(pos.x, pos.y, pos.width, pos.h);
+    boatAnimation.push(img);
+  }
+  var brokenBoatFrames = brokenBoatSpritedata.frames;
+  for (var i = 0; i< brokenBoatFrames.length; i++) {
+    var pos = brokenBoatFrames[i].position;
+    var img = brockenBoatSpriteSheet.get(pos.x, pos.y, pos.width, po.h);
+    brokenBoatAnimation.push(img);
   }
 }
 
+function draw() {
+  background(189);
+  image(backgroundImg, 0, 0, width, height);
+
+  Engine.update(engine);
+  ground.display();
+
+  showBoats();
+
+  for (var i = 0; i < balls.length; i++) {
+    showCannonBalls(balls[i], i);
+    for (var j = 0; j < boats.length; j++) {
+      if (balls[i] !== undefined && boats[j] !== undefined) {
+        var collision = Matter.SAT.collides(balls[i].body, boats[j].body);
+        if (collision.collided) {
+          boats[j].remove(j);
+
+          Matter.World.remove(world, balls[i].body);
+          balls.splice(i, 1);
+          i--;
+          
+        }
+      } 
+    }
+  }
+
+  cannon.display();
+  tower.display();
+}
+
+
+//creating the cannon ball on key press
+function keyPressed() {
+  if (keyCode === DOWN_ARROW) {
+    var cannonBall = new CannonBall(cannon.x, cannon.y);
+    cannonBall.trajectory = [];
+    Matter.Body.setAngle(cannonBall.body, cannon.angle);
+    balls.push(cannonBall);
+  }
+}
+
+// function to show the ball.
+function showCannonBalls(ball, index) {
+  ball.display();
+  if (ball.body.position.x >= width || ball.body.position.y >= height - 50) {
+    Matter.World.remove(world, ball.body);
+    balls.splice(index, 1);
+  }
+}
+
+
+//function to show the boat
+function showBoats() {
+  if (boats.length > 0) {
+    if (
+      boats.length < 4 &&
+      boats[boats.length - 1].body.position.x < width - 300
+    ) {
+      var positions = [-130, -100, -120, -80];
+      var position = random(positions);
+      var boat = new Boat(width,height - 100, 170, 170, position, boatAnimation);
+      boats.push(boat);
+    }
+
+    for (var i = 0; i < boats.length; i++) {
+      Matter.Body.setVelocity(boats[i].body, {
+        x: -0.9,
+        y: 0
+      });
+
+      boats[i].display();
+      boats[i].animate();
+    }
+  } else {
+    var boat = new Boat(width, height - 100, 170, 170, -60, boatAnimation);
+    boats.push(boat);
+  }
+}
+
+
+//releasing the cannonball on key release
+function keyReleased() {
+  if (keyCode === DOWN_ARROW) {
+    balls[balls.length - 1].shoot();
+  }
+}
 
 
